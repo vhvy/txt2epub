@@ -1,0 +1,28 @@
+<?xml version='1.0' encoding='utf-8'?>
+<package xmlns="http://www.idpf.org/2007/opf"
+    xmlns:dc="http://purl.org/dc/elements/1.1/" unique-identifier="bookid" version="2.0">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"
+        xmlns:opf="http://www.idpf.org/2007/opf">
+        <dc:title>$_TITLE</dc:title>
+        <dc:creator>$_AUTHOR</dc:creator>
+        <dc:description></dc:description>
+        <dc:language>zh-cn</dc:language>
+        <dc:date>$_CREATE_DATE</dc:date>
+        <dc:identifier id="bookid">$_BOOKID</dc:identifier>
+        <meta name="cover" content="cover-image"/>
+    </metadata>
+    <manifest>
+        $_MANIFEST_LIST
+        <item href="catalog.xhtml" id="catalog" media-type="application/xhtml+xml"/>
+        <item id="cover-image" href="cover.jpg" media-type="image/jpeg"/>
+        <item href="style/stylesheet.css" id="css" media-type="text/css"/>
+        <item href="toc.ncx" media-type="application/x-dtbncx+xml" id="ncx"/>
+    </manifest>
+    <spine toc="ncx">
+        <itemref idref="catalog"/>
+        $_ITEMREF_LIST
+    </spine>
+    <guide>
+        <reference href="catalog.xhtml" type="toc" title="目录"/>
+    </guide>
+</package>
