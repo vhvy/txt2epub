@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Input.css">
     <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Placeholder.css">
     <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/LightTip.css">
+    <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Loading.css">
     <title>TXT转EPUB</title>
 
     <style>
@@ -149,7 +150,8 @@
     <script type="module">
         import lightTip from 'https://qidian.gtimg.com/lulu/edge/js/common/ui/LightTip.js';
         import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
-        import detectFileEncodingAndLanguage from 'https://cdn.jsdelivr.net/npm/detect-file-encoding-and-language@2.3.3/+esm'
+        import detectFileEncodingAndLanguage from 'https://cdn.jsdelivr.net/npm/detect-file-encoding-and-language@2.3.3/+esm';
+        import "https://qidian.gtimg.com/lulu/edge/js/common/ui/Loading.js";
 
         const form = document.querySelector(".form");
         const coverUploadBtn = document.querySelector("input[name=cover]");
@@ -248,7 +250,11 @@
 
             return (path) => {
                 if (fileMap[path]) return fileMap[path];
-                fileMap[path] = fetch(path).then(res => res.text());
+                document.loading = '正在加载' + path;
+                fileMap[path] = fetch(path).then(res => {
+                    document.loading = false;
+                    return res.text();
+                });
 
                 return fileMap[path];
             }
@@ -447,13 +453,15 @@
         }
 
         async function handlePreviewEpub(form) {
+            const result = verifyFormData(form);
+            if (!result) return;
             const {
                 txtFile,
                 cover,
                 name,
                 author,
                 regExp
-            } = verifyFormData(form);
+            } = result;
 
             const txtContent = await getFileContent(txtFile);
             const sectionList = txtContent.match(regExp);

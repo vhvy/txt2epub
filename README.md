@@ -2,6 +2,8 @@
 
 思路很简单：读取 TXT 文件，然后通过正则匹配章节名并切割，按照 EPUB 文件定义的结构使用 JSZIP 制作压缩包，最后以 epub 的后缀名保存即可。
 
+DEMO: https://txt2epub.vhvy.me/
+
 参考资料： 
 + https://blog.csdn.net/qq_43257319/article/details/108530208
 
