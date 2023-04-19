@@ -5,10 +5,498 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Button.css">
+    <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Input.css">
+    <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Placeholder.css">
+    <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/LightTip.css">
     <title>TXT转EPUB</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .flex {
+            display: flex;
+        }
+
+        .flex-auto {
+            flex: 1;
+        }
+
+        .flex-align-center {
+            align-items: center;
+        }
+
+        .form {
+            border: 1px solid #ccc;
+            padding: 20px 30px;
+        }
+
+        .form-item {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            width: 100px;
+        }
+
+        .ui-input {
+            width: 300px;
+        }
+
+        .ui-button+.ui-button {
+            margin-left: 20px;
+        }
+
+        .require .form-label::after {
+            content: "*";
+            color: red;
+        }
+
+        .form-tips {
+            font-size: 14px;
+            margin-left: 20px;
+            color: #a2a9b6;
+        }
+
+        .cover-preview {
+            width: 100px;
+            height: 177px;
+            margin: 20px 0 0 100px;
+            display: none;
+            object-fit: contain;
+        }
+
+        .wrapper {
+            padding: 10px;
+            height: 100vh;
+        }
+
+        .cover-preview[src] {
+            display: block;
+        }
+
+
+        .section-list {
+            margin: 0 20px;
+            border: 1px solid #ccc;
+            overflow: auto;
+        }
+
+        .section-list li {
+            padding: 10px;
+            cursor: pointer;
+        }
+
+        .section-list li:hover {
+            background-color: antiquewhite;
+        }
+
+        .section-body {
+            border: 1px solid #ccc;
+            overflow: auto;
+            padding: 10px;
+        }
+    </style>
+    <style class="section-style"></style>
 </head>
 
 <body>
+    <div class="wrapper flex">
+        <form class="form flex-auto">
+            <div class="form-item flex flex-align-center require">
+                <label for="file" class="form-label">上传文件</label>
+                <input name="file" type="file" class="ui-input" accept=".txt" />
+                <span class="form-tips">在此上传原始TXT文件</span>
+            </div>
+            <div class="form-item">
+                <div class="flex flex-align-center require">
+                    <label for="cover" class="form-label ">上传封面</label>
+                    <input name="cover" type="file" class="ui-input" accept="image/*" />
+                    <span class="form-tips">在此上传EPUB文件封面</span>
+                </div>
+                <div>
+                    <img class="cover-preview" />
+                </div>
+            </div>
+            <div class="form-item flex flex-align-center require">
+                <label for="name" class="form-label">书籍名称</label>
+                <input name="name" class="ui-input" placeholder="请输入书籍名称" />
+            </div>
+            <div class="form-item flex flex-align-center require">
+                <label for="author" class="form-label">书籍作者</label>
+                <input name="author" class="ui-input" placeholder="请输入作者姓名" />
+            </div>
+            <div class="form-item flex flex-align-center require">
+                <label for="regexp" class="form-label">匹配正则</label>
+                <input name="regexp" class="ui-input" placeholder="请输入匹配章节的正则表达式"
+                    value="(\s|\n)(第)([\u4e00-\u9fa5a-zA-Z0-9]{1,7})[章][^\n]{1,35}(|\n)" />
+                <span class="form-tips">匹配不到章节时再修改正则</span>
+            </div>
+            <div class="form-item flex flex-align-center">
+                <label for="regexp" class="form-label"></label>
+                <button class="ui-button" data-type="test">测试</button>
+                <button type="primary" class="ui-button" data-type="save">保存</button>
+            </div>
+        </form>
+        <div class="section-list flex-auto"></div>
+        <div class="section-body flex-auto"></div>
+    </div>
+
+    <script type="module">
+        import lightTip from 'https://qidian.gtimg.com/lulu/edge/js/common/ui/LightTip.js';
+        import JSZip from 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm';
+        import detectFileEncodingAndLanguage from 'https://cdn.jsdelivr.net/npm/detect-file-encoding-and-language@2.3.3/+esm'
+
+        const form = document.querySelector(".form");
+        const coverUploadBtn = document.querySelector("input[name=cover]");
+        const coverPreviewDom = document.querySelector(".cover-preview");
+        const sectionListDom = document.querySelector(".section-list");
+        const sectionBodyDom = document.querySelector(".section-body");
+        const sectionStyleDom = document.querySelector(".section-style");
+
+        form.addEventListener("submit", function (e) {
+            e.preventDefault();
+            const type = e.submitter.dataset.type;
+            if (!type) return;
+            if (type === "save") {
+                handleSaveEpub(e.target);
+            } else if (type === "test") {
+                handlePreviewEpub(e.target);
+            }
+        });
+
+        coverUploadBtn.addEventListener("change", handleCoverUpload);
+
+        sectionListDom.addEventListener("click", (e) => {
+            if (e.target.nodeName === "LI") {
+                const { idx } = e.target.dataset;
+                sectionStyleDom.innerHTML = `.section-list li[data-idx="${idx}"] { background-color: aliceblue; }`;
+                renderSectionBody(idx);
+            }
+        });
+
+        function Tips(msg) {
+            new LightTip(msg, 2000, 'error');
+        }
+
+        function handleCoverUpload(e) {
+            const file = e.target.files[0];
+            if (!/^image\//.test(file.type)) {
+                Tips("请上传图片类型封面!");
+                return;
+            }
+            const src = URL.createObjectURL(file);
+            coverPreviewDom.src = src;
+        }
+
+        function verifyFormData(form) {
+            const txtFile = form.file.files[0];
+            const cover = form.cover.files[0];
+            const name = form.name.value.trim();
+            const author = form.author.value.trim();
+            const regExp = form.regexp.value.trim();
+
+            if (!txtFile || !/text\/plain/.test(txtFile.type)) {
+                Tips("请上传TXT文件!");
+                return;
+            }
+
+            if (!cover || !/^image\//.test(cover.type)) {
+                Tips("请上传封面文件!");
+                return;
+            }
+
+            if (!name) {
+                Tips("请填写书籍名称!");
+                return;
+            }
+
+            if (!author) {
+                Tips("请填写书籍作者!");
+                return;
+            }
+
+            if (!regExp) {
+                Tips("请填写正则表达式!");
+                return;
+            }
+
+            let _regExp;
+
+            try {
+                _regExp = new RegExp(regExp, "g");
+            } catch (err) {
+                Tips("正则表达式不合法!");
+                return;
+            }
+
+            return {
+                txtFile,
+                cover,
+                name,
+                author,
+                regExp: _regExp
+            };
+        }
+
+        const getHttpFileAsText = (() => {
+            const fileMap = {};
+
+            return (path) => {
+                if (fileMap[path]) return fileMap[path];
+                fileMap[path] = fetch(path).then(res => res.text());
+
+                return fileMap[path];
+            }
+        })();
+
+        const EPUB_STRUCT = [
+            {
+                type: "file",
+                name: "mimetype",
+                content: "application/epub+zip"
+            },
+            {
+                type: "dir",
+                name: "META-INF",
+                fileList: [
+                    {
+                        type: "file",
+                        name: "container.xml",
+                        generatorFn: () => getHttpFileAsText("/assets/container.xml")
+                    }
+                ]
+            },
+            {
+                type: "dir",
+                name: "OEBPS",
+                fileList: [
+                    {
+                        type: "file",
+                        name: "content.opf",
+                        generatorFn: async (info) => {
+                            const template = await getHttpFileAsText("/assets/content.opf");
+
+                            const manifestItemStr = window.parseResult.map((_, idx) => {
+                                return `<item href="section/chapter${idx + 1}.xhtml" id="id${idx + 1}" media-type="application/xhtml+xml"/>`;
+                            }).join("");
+
+                            const spineItemRefStr = window.parseResult.map((_, idx) => {
+                                return `<itemref idref="id${idx + 1}"/>`;
+                            }).join("");
+
+                            return template
+                                .replace("$_TITLE", info.name)
+                                .replace("$_AUTHOR", info.author)
+                                .replace("$_CREATE_DATE", new Date().toISOString().slice(0, 19) + "Z+08:00")
+                                .replace("$_BOOKID", parseInt(Math.random() * 100000))
+                                .replace("$_MANIFEST_LIST", manifestItemStr)
+                                .replace("$_ITEMREF_LIST", spineItemRefStr);
+                        }
+                    },
+                    {
+                        type: "dir",
+                        name: "style",
+                        fileList: [
+                            {
+                                type: "file",
+                                name: "stylesheet.css",
+                                generatorFn: () => getHttpFileAsText("/assets/stylesheet.css"),
+                            }
+                        ]
+                    },
+                    {
+                        type: "file",
+                        name: "catalog.xhtml",
+                        generatorFn: async (info) => {
+                            const template = await getHttpFileAsText("/assets/catalog.xhtml");
+                            const catalogStr = window.parseResult.map(({ name }, idx) => {
+                                return `<li class="catalog"><a href="section/chapter${idx + 1}.xhtml">${name}</a></li>`;
+                            }).join("");
+
+                            return template
+                                .replace("$_TITLE", info.name)
+                                .replace("$_CATALOG", catalogStr);
+                        }
+                    },
+                    {
+                        type: "file",
+                        name: "toc.ncx",
+                        generatorFn: async (info,) => {
+                            const template = await getHttpFileAsText("/assets/toc.ncx");
+                            const tocBodyStr = window.parseResult.map(({ name }, idx) => {
+                                return `<navPoint id="id${idx + 1}" playOrder="${idx + 1}">
+                                            <navLabel>
+                                                <text>${name}</text>
+                                            </navLabel>
+                                            <content src="section/chapter${idx + 1}.xhtml"/>
+                                        </navPoint>`;
+                            }).join("");
+
+                            return template
+                                .replace("$_TITLE", info.name)
+                                .replace("$_AUTHOR", info.author)
+                                .replace("$_TOC_BODY", tocBodyStr);
+                        }
+                    },
+                    {
+                        type: "file",
+                        name: "cover.jpg",
+                        generatorFn: (info) => {
+                            return info.cover;
+                        }
+                    },
+                    {
+                        type: "dir",
+                        name: "section",
+                        generatorFn: async (info) => {
+                            const template = await getHttpFileAsText("/assets/section.xhtml");
+                            return window.parseResult.map(({ name, body }, idx) => {
+                                const content = body
+                                    .split("\n")
+                                    .map(item => `<p>${item}</p>`)
+                                    .join("");
+
+                                return {
+                                    type: "file",
+                                    name: `chapter${idx + 1}.xhtml`,
+                                    content: template
+                                        .replaceAll("$_TITLE", name)
+                                        .replace("$_CONTENT", content)
+                                };
+                            });
+                        }
+                    }
+                ]
+            }
+        ];
+
+        async function createZip(zip, info, list) {
+            for (let { type, content, name, generatorFn, fileList } of list) {
+                if (type === "file") {
+                    if (!content) {
+                        content = await generatorFn(info);
+                    }
+                    zip.file(name, content);
+                } else if (type === "dir") {
+                    const dir = zip.folder(name);
+                    if (!fileList) {
+                        fileList = await generatorFn(info);
+                    }
+                    await createZip(dir, info, fileList);
+                }
+            }
+        }
+
+        function saveAs(file, name) {
+            const url = URL.createObjectURL(file);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = name;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        async function handleSaveEpub(form) {
+            const info = await handlePreviewEpub(form);
+
+            const zip = new JSZip();
+            await createZip(zip, info, EPUB_STRUCT);
+
+            zip.generateAsync({ type: "blob" })
+                .then(function (content) {
+                    saveAs(content, info.name + ".epub");
+                });
+        }
+
+        function getFileContent(file) {
+            return new Promise(async (resolve, reject) => {
+
+                try {
+                    const { encoding } = await detectFileEncodingAndLanguage(file);
+                    const fileReader = new FileReader();
+
+                    const handleLoaded = () => {
+                        resolve(fileReader.result);
+                    }
+
+                    fileReader.addEventListener("load", handleLoaded);
+                    fileReader.addEventListener("error", (e) => {
+                        reject(e);
+                    });
+                    fileReader.readAsText(file, encoding);
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
+        function renderSectionList(list) {
+            let htmlStr = list.map(({ name }, idx) => `<li data-idx="${idx}">${name}</li>`).join("");
+            htmlStr = `<ul>${htmlStr}</ul>`;
+            sectionListDom.innerHTML = htmlStr;
+        }
+
+        function renderSectionBody(idx) {
+            const { body } = window.parseResult[idx];
+            sectionBodyDom.innerText = body;
+        }
+
+        async function handlePreviewEpub(form) {
+            const {
+                txtFile,
+                cover,
+                name,
+                author,
+                regExp
+            } = verifyFormData(form);
+
+            const txtContent = await getFileContent(txtFile);
+            const sectionList = txtContent.match(regExp);
+
+            if (!sectionList) return Tips("没有匹配到任何章节信息!");
+
+            const parseResult = [];
+
+            let lastIdx;
+
+            sectionList.forEach((name, idx) => {
+                name = name.trim();
+                let body;
+
+                const startIdx = lastIdx === undefined ? txtContent.indexOf(name) : lastIdx;
+
+                if (idx + 1 === sectionList.length) {
+                    body = txtContent.slice(startIdx + name.length + 1);
+                } else {
+                    const endIdx = lastIdx = txtContent.indexOf(sectionList[idx + 1]);
+                    body = txtContent.slice(startIdx + name.length + 1, endIdx);
+                }
+
+
+                parseResult.push({
+                    name,
+                    body
+                });
+            });
+
+            window.parseResult = parseResult;
+            sectionBodyDom.innerHTML = "";
+            renderSectionList(parseResult);
+
+            return {
+                txtFile,
+                cover,
+                name,
+                author,
+                regExp
+            };
+        }
+    </script>
 </body>
 
 </html>
