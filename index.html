@@ -4,7 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+        content="width=device-width,user-scalable=no,initial-scale=1,maximum-scale=1,minimum-scale=1,viewport-fit=cover">
     <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Button.css">
     <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Input.css">
     <link rel="stylesheet" href="https://qidian.gtimg.com/lulu/edge/css/common/ui/Placeholder.css">
@@ -38,6 +39,7 @@
 
         .form-item {
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
 
         .form-label {
@@ -73,7 +75,7 @@
 
         .wrapper {
             padding: 10px;
-            height: 100vh;
+            flex-flow: row wrap;
         }
 
         .cover-preview[src] {
@@ -101,6 +103,33 @@
             overflow: auto;
             padding: 10px;
         }
+
+        .section-list,
+        .section-body {
+            max-height: calc(100vh - 20px);
+        }
+
+        @media screen and (max-width: 960px) {
+            .form {
+                flex: 0 1 calc(100vw - 20px);
+            }
+        }
+
+        @media screen and (max-width: 640px) {
+
+            .section-list,
+            .section-body {
+                flex: 0 1 calc(100vw - 20px);
+            }
+
+            .ui-input {
+                width: calc(100% - 100px);
+            }
+
+            .form-tips {
+                margin: 10px 0 0 100px;
+            }
+        }
     </style>
     <style class="section-style"></style>
 </head>
@@ -113,15 +142,11 @@
                 <input name="file" type="file" class="ui-input" accept=".txt" />
                 <span class="form-tips">在此上传原始TXT文件</span>
             </div>
-            <div class="form-item">
-                <div class="flex flex-align-center require">
-                    <label for="cover" class="form-label ">上传封面</label>
-                    <input name="cover" type="file" class="ui-input" accept="image/*" />
-                    <span class="form-tips">在此上传EPUB文件封面</span>
-                </div>
-                <div>
-                    <img class="cover-preview" />
-                </div>
+            <div class="form-item flex flex-align-center require">
+                <label for="cover" class="form-label ">上传封面</label>
+                <input name="cover" type="file" class="ui-input" accept="image/*" />
+                <span class="form-tips">在此上传EPUB文件封面</span>
+                <img class="cover-preview" />
             </div>
             <div class="form-item flex flex-align-center require">
                 <label for="name" class="form-label">书籍名称</label>
@@ -409,6 +434,8 @@
 
         async function handleSaveEpub(form) {
             const info = await handlePreviewEpub(form);
+
+            if (!info) return;
 
             const zip = new JSZip();
             await createZip(zip, info, EPUB_STRUCT);
